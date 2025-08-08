@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -136,12 +135,11 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
         
         let isWaitingForResponse = false;
 
-        // --- API Communicatie ---
+        // --- API Communicatie met verbeterde foutafhandeling ---
         async function getAiResponse(prompt) {
-            const apiKey = "AIzaSyDAdvrApo-i8HtM6Rzbsn8cTsDoY9AQ0Vg";
+            const apiKey = "AIzaSyCYzsuS6F1awmF8IqV7113kqDoz7x8v2Mc";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
-            // Voeg de nieuwe gebruikersprompt toe aan de geschiedenis
             conversationHistory.push({ role: "user", parts: [{ text: prompt }] });
 
             const payload = {
@@ -156,25 +154,33 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
                 });
 
                 if (!response.ok) {
-                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                    const errorBody = await response.json().catch(() => ({}));
+                    console.error("API Error Details:", { status: response.status, body: errorBody });
+                    let userMessage = `API Fout (Status ${response.status}).`;
+                    if (response.status === 400) {
+                        userMessage += " Dit kan duiden op een ongeldige API-sleutel of een probleem met de HTTP-verwijzer (referrer) instellingen in je Google Cloud project.";
+                    } else if (response.status === 403) {
+                        userMessage += " Toegang geweigerd. Controleer of de 'Generative Language API' is ingeschakeld en of er een geldig factureringsaccount aan je project is gekoppeld.";
+                    } else {
+                        userMessage += " Raadpleeg de console (Rechtermuisknop > Inspecteren > Console) voor technische details.";
+                    }
+                    throw new Error(userMessage);
                 }
 
                 const result = await response.json();
                 
                 if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
                     const aiText = result.candidates[0].content.parts[0].text;
-                    // Voeg AI-antwoord toe aan de geschiedenis
                     conversationHistory.push({ role: "model", parts: [{ text: aiText }] });
                     return aiText;
                 } else {
-                    console.error("Unexpected API response structure:", result);
-                    return "Sorry, er ging iets mis bij het verwerken van mijn antwoord.";
+                     console.error("Unexpected API response structure:", result);
+                     throw new Error("Onverwachte reactie van de AI, kon geen antwoord vinden.");
                 }
             } catch (error) {
-                console.error("Fout bij het aanroepen van de Gemini API:", error);
-                // Verwijder de laatste user prompt als de API call faalt
-                conversationHistory.pop();
-                return "Mijn excuses, ik kan momenteel geen verbinding maken. Probeer het later opnieuw.";
+                console.error("Fout in getAiResponse:", error);
+                conversationHistory.pop(); // Verwijder de mislukte gebruikersprompt
+                return `Mijn excuses, er is een technische fout opgetreden. Details: ${error.message}`;
             }
         }
         
@@ -186,7 +192,6 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
             const messageBubble = document.createElement('div');
             messageBubble.classList.add('p-3', 'rounded-xl', 'message-bubble');
             
-            // Gebruik innerHTML om line breaks en markdown (bold) te renderen
             let formattedMessage = message.replace(/\n/g, '<br>');
             formattedMessage = formattedMessage.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             messageBubble.innerHTML = formattedMessage;
@@ -194,14 +199,19 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
             if (sender === 'user') {
                 messageWrapper.classList.add('justify-end');
                 messageBubble.classList.add('bg-blue-600', 'text-white');
-            } else {
+            } else { // 'ai' or 'error'
                 messageWrapper.classList.add('justify-start');
-                messageBubble.classList.add('bg-slate-200', 'text-slate-800');
+                // Geef foutmeldingen een andere kleur
+                if (message.includes("technische fout")) {
+                    messageBubble.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-200');
+                } else {
+                    messageBubble.classList.add('bg-slate-200', 'text-slate-800');
+                }
             }
 
             messageWrapper.appendChild(messageBubble);
             chatContainer.appendChild(messageWrapper);
-            chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
         
         function toggleLoading(isLoading) {
@@ -235,7 +245,6 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
         });
 
         summarizeButton.addEventListener('click', async () => {
-            // Check of er meer is dan alleen het systeem- en startbericht
             if (conversationHistory.length <= 3) {
                 alert("Voer eerst een gesprek voordat je een samenvatting kunt maken.");
                 return;
@@ -247,7 +256,7 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
             summarizeButton.disabled = true;
             
             const fullConversationText = conversationHistory
-                .slice(1) // Sla de system prompt over voor de samenvatting
+                .slice(1) 
                 .map(msg => `${msg.role === 'user' ? 'Medewerker' : 'Atlas'}: ${msg.parts[0].text}`)
                 .join('\n\n');
 
@@ -262,25 +271,22 @@ Hier is het gesprek:
 ---
 ${fullConversationText}`;
 
-            // Gebruik een aparte API call voor de samenvatting
             const summaryResponse = await getAiResponseForSummary(summaryPrompt);
 
             summaryLoading.classList.add('hidden');
             let formattedSummary = summaryResponse.replace(/\n/g, '<br>');
             formattedSummary = formattedSummary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            summaryContent.innerHTML = formattedSummary; // Gebruik innerHTML voor de markdown
+            summaryContent.innerHTML = formattedSummary;
             summaryContent.classList.remove('hidden');
             summaryFooter.classList.remove('hidden');
             summarizeButton.disabled = false;
         });
         
-        // Aparte functie voor samenvatting om de history niet te vervuilen
         async function getAiResponseForSummary(prompt) {
-             const apiKey = "AIzaSyDAdvrApo-i8HtM6Rzbsn8cTsDoY9AQ0Vg";
+             const apiKey = "AIzaSyCYzsuS6F1awmF8IqV7113kqDoz7x8v2Mc";
              const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
              
              const payload = {
-                // Stuur alleen de samenvattingsprompt, niet de hele geschiedenis
                 contents: [{ role: "user", parts: [{ text: prompt }] }]
              };
              
@@ -290,7 +296,17 @@ ${fullConversationText}`;
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                 if (!response.ok) throw new Error(`API error: ${response.status}`);
+                 if (!response.ok) {
+                    const errorBody = await response.json().catch(() => ({}));
+                    console.error("API Error Details:", { status: response.status, body: errorBody });
+                    let userMessage = `API Fout (Status ${response.status}).`;
+                     if (response.status === 400) {
+                        userMessage += " Probleem met API-sleutel of referrer.";
+                    } else if (response.status === 403) {
+                        userMessage += " Toegang geweigerd. Controleer API- en factuurinstellingen.";
+                    }
+                    throw new Error(userMessage);
+                 }
                  const result = await response.json();
                  if (result.candidates && result.candidates[0].content.parts.length > 0) {
                      return result.candidates[0].content.parts[0].text;
@@ -299,14 +315,12 @@ ${fullConversationText}`;
                  }
              } catch (error) {
                  console.error("Fout bij genereren samenvatting:", error);
-                 return "Er is een fout opgetreden bij het maken van de samenvatting.";
+                 return `Fout bij samenvatting: ${error.message}`;
              }
         }
 
         copySummaryButton.addEventListener('click', () => {
-            // Creëer een tijdelijk textarea element om de tekst te kopiëren
             const textarea = document.createElement('textarea');
-            // Converteer de HTML van de samenvatting naar platte tekst
             textarea.value = summaryContent.innerText; 
             document.body.appendChild(textarea);
             textarea.select();
@@ -324,7 +338,6 @@ ${fullConversationText}`;
         // --- Start van de app ---
         async function startConversation() {
             toggleLoading(true);
-            // De eerste boodschap wordt gegenereerd op basis van de system prompt
             const initialMessage = await getAiResponse("Start het gesprek.");
             toggleLoading(false);
             addMessageToChat('ai', initialMessage);
@@ -335,7 +348,3 @@ ${fullConversationText}`;
     </script>
 </body>
 </html>
-
-
-
-

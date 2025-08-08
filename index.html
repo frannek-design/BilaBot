@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gespreks-app | Atlas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        #chat-container::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        #chat-container::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .message-bubble {
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl flex flex-col lg:flex-row gap-4 h-[calc(100vh-2rem)]">
+        
+        <!-- Chat Section -->
+        <div class="flex flex-col w-full lg:w-2/3 bg-white rounded-2xl shadow-lg h-full">
+            <header class="p-4 border-b border-slate-200">
+                <h1 class="text-xl font-bold text-slate-800">Gesprek met Atlas</h1>
+                <p class="text-sm text-slate-500">Jouw persoonlijke AI-sparringpartner</p>
+            </header>
+
+            <main id="chat-container" class="flex-1 p-4 overflow-y-auto">
+                <!-- Chat messages will be appended here -->
+            </main>
+
+            <footer class="p-4 border-t border-slate-200">
+                <div id="loading-indicator" class="hidden text-center text-sm text-slate-500 mb-2">
+                    <div class="flex items-center justify-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Atlas is aan het typen...</span>
+                    </div>
+                </div>
+                <form id="chat-form" class="flex items-center gap-3">
+                    <input type="text" id="message-input" class="flex-1 p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition" placeholder="Typ je bericht...">
+                    <button type="submit" class="bg-blue-600 text-white font-semibold px-5 py-3 rounded-xl hover:bg-blue-700 transition active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                        Verstuur
+                    </button>
+                </form>
+            </footer>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="flex flex-col w-full lg:w-1/3 bg-white rounded-2xl shadow-lg h-full">
+            <header class="p-4 border-b border-slate-200">
+                <h2 class="text-xl font-bold text-slate-800">Gespreksverslag</h2>
+                <p class="text-sm text-slate-500">Samenvatting en actiepunten</p>
+            </header>
+            
+            <div id="summary-controls" class="p-4">
+                 <button id="summarize-button" class="w-full bg-green-600 text-white font-semibold p-3 rounded-xl hover:bg-green-700 transition active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                    Maak samenvatting
+                </button>
+            </div>
+
+            <div id="summary-container" class="flex-1 p-4 overflow-y-auto bg-slate-50 rounded-b-2xl">
+                <div id="summary-placeholder" class="text-slate-500 text-center mt-8">
+                    Klik op 'Maak samenvatting' om hier het verslag te genereren.
+                </div>
+                <div id="summary-content" class="hidden prose prose-sm max-w-none">
+                    <!-- Summary will be injected here -->
+                </div>
+                <div id="summary-loading" class="hidden text-center text-sm text-slate-500 mt-8">
+                     <div class="flex items-center justify-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Samenvatting wordt gemaakt...</span>
+                    </div>
+                </div>
+            </div>
+             <footer id="summary-footer" class="p-4 border-t border-slate-200 hidden">
+                <button id="copy-summary-button" class="w-full bg-slate-600 text-white font-semibold p-3 rounded-xl hover:bg-slate-700 transition active:scale-95">
+                    Kopieer verslag
+                </button>
+                <div id="copy-feedback" class="text-center text-sm text-green-600 mt-2 hidden">Gekopieerd!</div>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elementen ---
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const summarizeButton = document.getElementById('summarize-button');
+        const summaryContainer = document.getElementById('summary-container');
+        const summaryPlaceholder = document.getElementById('summary-placeholder');
+        const summaryContent = document.getElementById('summary-content');
+        const summaryLoading = document.getElementById('summary-loading');
+        const summaryFooter = document.getElementById('summary-footer');
+        const copySummaryButton = document.getElementById('copy-summary-button');
+        const copyFeedback = document.getElementById('copy-feedback');
+
+        // --- Gesprekslogica ---
+        const systemPrompt = `Je bent Atlas, een persoonlijke AI-consultant en sparringpartner voor een medewerker van het team **Tech Solutions** binnen de afdeling Change & Development van een Nederlandse schadeverzekeraar.
+
+De afdeling **Change & Development** bestaat naast jouw team uit **Team Customer Interaction** (focus op selfservice) en **Team Automation & Workflow** (focus op back-end processen). Jullie werken agile en iteratief om de organisatie te vernieuwen. De strategische doelen van het bedrijf zijn het verhogen van **selfservice** (naar 50%) en het implementeren van **slimme processen**.
+
+Hoewel de medewerker als lid van Tech Solutions openstaat voor vernieuwing, is de bredere organisatie traditioneel. Een belangrijke uitdaging is dus het creëren van draagvlak en het aantonen van de waarde van nieuwe technologie.
+
+Jouw rol is om te sparren over zowel **persoonlijke ontwikkeling** als **inhoudelijke, werkgerelateerde vraagstukken**. Probeer een goede balans te vinden tussen deze twee en voel aan waar de behoefte in het gesprek ligt. Stel empathische en kritische vragen en houd je antwoorden bondig.
+
+Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
+
+        let conversationHistory = [{
+            role: "system",
+            parts: [{ text: systemPrompt }]
+        }];
+        
+        let isWaitingForResponse = false;
+
+        // --- API Communicatie ---
+        async function getAiResponse(prompt) {
+            const apiKey = ""; // API key wordt automatisch afgehandeld door de omgeving
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            // Voeg de nieuwe gebruikersprompt toe aan de geschiedenis
+            conversationHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+            const payload = {
+                contents: conversationHistory
+            };
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
+                    const aiText = result.candidates[0].content.parts[0].text;
+                    // Voeg AI-antwoord toe aan de geschiedenis
+                    conversationHistory.push({ role: "model", parts: [{ text: aiText }] });
+                    return aiText;
+                } else {
+                    console.error("Unexpected API response structure:", result);
+                    return "Sorry, er ging iets mis bij het verwerken van mijn antwoord.";
+                }
+            } catch (error) {
+                console.error("Fout bij het aanroepen van de Gemini API:", error);
+                // Verwijder de laatste user prompt als de API call faalt
+                conversationHistory.pop();
+                return "Mijn excuses, ik kan momenteel geen verbinding maken. Probeer het later opnieuw.";
+            }
+        }
+        
+        // --- UI Functies ---
+        function addMessageToChat(sender, message) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.classList.add('flex', 'mb-4');
+
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('p-3', 'rounded-xl', 'message-bubble');
+            
+            // Gebruik innerHTML om line breaks en markdown (bold) te renderen
+            let formattedMessage = message.replace(/\n/g, '<br>');
+            formattedMessage = formattedMessage.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            messageBubble.innerHTML = formattedMessage;
+
+            if (sender === 'user') {
+                messageWrapper.classList.add('justify-end');
+                messageBubble.classList.add('bg-blue-600', 'text-white');
+            } else {
+                messageWrapper.classList.add('justify-start');
+                messageBubble.classList.add('bg-slate-200', 'text-slate-800');
+            }
+
+            messageWrapper.appendChild(messageBubble);
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll
+        }
+        
+        function toggleLoading(isLoading) {
+            isWaitingForResponse = isLoading;
+            if (isLoading) {
+                loadingIndicator.classList.remove('hidden');
+                messageInput.disabled = true;
+                chatForm.querySelector('button').disabled = true;
+            } else {
+                loadingIndicator.classList.add('hidden');
+                messageInput.disabled = false;
+                chatForm.querySelector('button').disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        // --- Event Handlers ---
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userInput = messageInput.value.trim();
+            if (!userInput || isWaitingForResponse) return;
+
+            addMessageToChat('user', userInput);
+            messageInput.value = '';
+            toggleLoading(true);
+
+            const aiResponse = await getAiResponse(userInput);
+            
+            toggleLoading(false);
+            addMessageToChat('ai', aiResponse);
+        });
+
+        summarizeButton.addEventListener('click', async () => {
+            // Check of er meer is dan alleen het systeem- en startbericht
+            if (conversationHistory.length <= 3) {
+                alert("Voer eerst een gesprek voordat je een samenvatting kunt maken.");
+                return;
+            }
+            
+            summaryPlaceholder.classList.add('hidden');
+            summaryContent.classList.add('hidden');
+            summaryLoading.classList.remove('hidden');
+            summarizeButton.disabled = true;
+            
+            const fullConversationText = conversationHistory
+                .slice(1) // Sla de system prompt over voor de samenvatting
+                .map(msg => `${msg.role === 'user' ? 'Medewerker' : 'Atlas'}: ${msg.parts[0].text}`)
+                .join('\n\n');
+
+            const summaryPrompt = `Je bent een expert in het samenvatten van professionele gesprekken. Vat het volgende gesprek tussen een medewerker en de AI-consultant Atlas samen. Structureer de samenvatting met de volgende onderdelen, indien van toepassing:
+- **Kern van het gesprek:** Een korte alinea die de belangrijkste besproken thema's beschrijft.
+- **Belangrijkste inzichten:** Een lijst met de meest waardevolle inzichten of conclusies.
+- **Actiepunten:** Een duidelijke lijst van eventuele actiepunten voor de medewerker of Atlas.
+- **Gevoelsreflectie:** Een korte opmerking over de sfeer of het gevoel van het gesprek.
+Gebruik Markdown voor de opmaak (bold met **tekst**).
+
+Hier is het gesprek:
+---
+${fullConversationText}`;
+
+            // Gebruik een aparte API call voor de samenvatting
+            const summaryResponse = await getAiResponseForSummary(summaryPrompt);
+
+            summaryLoading.classList.add('hidden');
+            let formattedSummary = summaryResponse.replace(/\n/g, '<br>');
+            formattedSummary = formattedSummary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            summaryContent.innerHTML = formattedSummary; // Gebruik innerHTML voor de markdown
+            summaryContent.classList.remove('hidden');
+            summaryFooter.classList.remove('hidden');
+            summarizeButton.disabled = false;
+        });
+        
+        // Aparte functie voor samenvatting om de history niet te vervuilen
+        async function getAiResponseForSummary(prompt) {
+             const apiKey = ""; // API key wordt automatisch afgehandeld door de omgeving
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+             
+             const payload = {
+                // Stuur alleen de samenvattingsprompt, niet de hele geschiedenis
+                contents: [{ role: "user", parts: [{ text: prompt }] }]
+             };
+             
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                 if (!response.ok) throw new Error(`API error: ${response.status}`);
+                 const result = await response.json();
+                 if (result.candidates && result.candidates[0].content.parts.length > 0) {
+                     return result.candidates[0].content.parts[0].text;
+                 } else {
+                     return "Kon geen samenvatting genereren.";
+                 }
+             } catch (error) {
+                 console.error("Fout bij genereren samenvatting:", error);
+                 return "Er is een fout opgetreden bij het maken van de samenvatting.";
+             }
+        }
+
+        copySummaryButton.addEventListener('click', () => {
+            // Creëer een tijdelijk textarea element om de tekst te kopiëren
+            const textarea = document.createElement('textarea');
+            // Converteer de HTML van de samenvatting naar platte tekst
+            textarea.value = summaryContent.innerText; 
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                copyFeedback.classList.remove('hidden');
+                setTimeout(() => copyFeedback.classList.add('hidden'), 2000);
+            } catch (err) {
+                console.error('Kopiëren is mislukt', err);
+                alert('Kopiëren is mislukt. Probeer het handmatig.');
+            }
+            document.body.removeChild(textarea);
+        });
+
+        // --- Start van de app ---
+        async function startConversation() {
+            toggleLoading(true);
+            // De eerste boodschap wordt gegenereerd op basis van de system prompt
+            const initialMessage = await getAiResponse("Start het gesprek.");
+            toggleLoading(false);
+            addMessageToChat('ai', initialMessage);
+        }
+
+        window.onload = startConversation;
+
+    </script>
+</body>
+</html>

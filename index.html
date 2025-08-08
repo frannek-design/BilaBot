@@ -128,10 +128,8 @@ Jouw rol is om te sparren over zowel **persoonlijke ontwikkeling** als **inhoude
 
 Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
 
-        let conversationHistory = [{
-            role: "system",
-            parts: [{ text: systemPrompt }]
-        }];
+        // CORRECTIE: Initialiseer de geschiedenis als een lege array.
+        let conversationHistory = [];
         
         let isWaitingForResponse = false;
 
@@ -142,8 +140,12 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
 
             conversationHistory.push({ role: "user", parts: [{ text: prompt }] });
 
+            // CORRECTIE: Bouw de payload met het 'system_instruction' veld.
             const payload = {
-                contents: conversationHistory
+                contents: conversationHistory,
+                system_instruction: {
+                    parts: [{ text: systemPrompt }]
+                }
             };
             
             try {
@@ -171,6 +173,7 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
                 
                 if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
                     const aiText = result.candidates[0].content.parts[0].text;
+                    // Voeg AI-antwoord toe aan de geschiedenis voor de volgende beurt
                     conversationHistory.push({ role: "model", parts: [{ text: aiText }] });
                     return aiText;
                 } else {
@@ -245,7 +248,8 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
         });
 
         summarizeButton.addEventListener('click', async () => {
-            if (conversationHistory.length <= 3) {
+            // Check of er een gesprek is gevoerd
+            if (conversationHistory.length === 0) {
                 alert("Voer eerst een gesprek voordat je een samenvatting kunt maken.");
                 return;
             }
@@ -256,7 +260,6 @@ Begin het gesprek altijd met de vraag "Hoi, hoe gaat het met je?".`;
             summarizeButton.disabled = true;
             
             const fullConversationText = conversationHistory
-                .slice(1) 
                 .map(msg => `${msg.role === 'user' ? 'Medewerker' : 'Atlas'}: ${msg.parts[0].text}`)
                 .join('\n\n');
 
